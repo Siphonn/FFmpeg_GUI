@@ -1,8 +1,7 @@
 ﻿using FFmpeg_GUI.Properties;
+using System;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 
@@ -13,90 +12,74 @@ namespace FFmpeg_GUI
     /// </summary>
     public partial class MainWindow : Window
     {
+        public string imgName = "";
+        public int imgType = 0;
+        public string startFrame = "0000";
+        public int fps = 1;
+        public string outName = "";
+        public int outType = 0;
+
+
         public MainWindow()
         {
             InitializeComponent();
-            _windowName.Text = "Video Compiler " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
             CheckForPreviousSettings();
+            _windowName.Text = "Video Compiler " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
+
+            Loaded += LoadePage1; /// load Page1_Simple on startup
         }
 
-        /// <summary>
-        /// Check if there are any settings save from a previous session.
-        /// Set defaults if no previous settings found.
-        /// </summary>
         private void CheckForPreviousSettings()
         {
             /// Load previus setting if 'ImageName' OR 'OutputName' is not null or empty
-            if (!string.IsNullOrEmpty(Settings.Default.ImageName) || !string.IsNullOrEmpty(Settings.Default.OutputName))
+            if (!string.IsNullOrWhiteSpace(Settings.Default.ImageName) || !string.IsNullOrWhiteSpace(Settings.Default.OutputName))
             {
-                _imgName.Text = Settings.Default.ImageName;
-                _imgType.SelectedIndex = Settings.Default.ImageType;
-                _startFrame.Text = Settings.Default.StartFrame;
-                _fps.SelectedIndex = Settings.Default.FPS;
-                _outName.Text = Settings.Default.OutputName;
-                _outType.SelectedIndex = Settings.Default.OutputType;
+                imgName = Settings.Default.ImageName;
+                imgType = Settings.Default.ImageType;
+                startFrame = Settings.Default.StartFrame;
+                fps = Settings.Default.FPS;
+                outName = Settings.Default.OutputName;
+                outType = Settings.Default.OutputType;
             }
             else /// else load deafult settings
             {
-                _imgName.Text = "";
-                _imgType.SelectedIndex = 0;
-                _startFrame.Text = "0000";
-                _fps.SelectedIndex = 1;
-                _outName.Text = "";
-                _outType.SelectedIndex = 0;
+                imgName = "";
+                imgType = 0;
+                startFrame = "0000";
+                fps = 2;
+                outName = "";
+                outType = 0;
             }
         }
 
-        /// <summary>
-        /// Run ffmeg compile string using current input settings.
-        /// EXAMPLE: //ffmpeg.exe -framerate 30 -i InputImage.% 4d.jpeg -c:v libx264 -r 30 -pix_fmt yuv420p -crf 18 -preset slower _OutputVideo.mp4
-        /// </summary>
-        private void RunCompiler(object sender, RoutedEventArgs e)
+        private void LoadePage1(object sender, RoutedEventArgs e)
         {
-            string inputCommand;
-
-            string inputFPS = " -framerate " + _fps.Text;
-            string startFrame = " -start_number " + _startFrame.Text;
-            string inputShotName = " -i " + _imgName.Text + "." + "%" + _startFrame.Text.Length + "d." + _imgType.Text;
-            string encoding = " -c:v libx264";
-            string outputFPS = " -r " + _fps.Text;
-            string pixelFormat = " -pix_fmt yuv420p";
-            string bitrate = " -crf 18";
-            string preset = " -preset slower ";
-            string outputVideoName = _outName.Text + "." + _outType.Text;
-
-            /// '/k' will keep the window open and '/c' will close the window the command has finished
-            /// Compile entered values to a single string.
-            inputCommand = "/c ffmpeg.exe" +
-                inputFPS +
-                startFrame +
-                inputShotName +
-                encoding +
-                outputFPS +
-                pixelFormat +
-                bitrate +
-                preset +
-                outputVideoName;
-
-            Process.Start("CMD.exe", inputCommand);
-            /// Is FPS output needed? (-r 30)
-            //MessageBox.Show(inputCommand); ///Debug inputs 
+            frame.NavigationService.Navigate(new Page1_Simple(this));
         }
 
-        /// <summary>
-        /// Close application.
-        /// </summary>
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        private void ModeSelection_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
-            Application.Current.Shutdown();
+            if (frame == null) { return; }
+
+            switch (modeSelection.SelectedIndex)
+            {
+                case 0:
+                    frame.NavigationService.Navigate(new Page1_Simple(this));
+                    break;
+                case 1:
+                    frame.NavigationService.Navigate(new Page2_Advanced(this));
+                    break;
+            }
         }
 
-        /// <summary>
-        /// Minimise application.
-        /// </summary>
-        private void MinButton_Click(object sender, RoutedEventArgs e)
+        internal void StoreValues(string _imgName, string _startFrame, string _outName, int _imgType, int _fps, int _outType)
         {
-            WindowState = WindowState.Minimized;
+            imgName = _imgName;
+            imgType = _imgType;
+            startFrame = _startFrame;
+            fps = _fps;
+            outName = _outName;
+            outType = _outType;
         }
 
         /// <summary>
@@ -109,11 +92,19 @@ namespace FFmpeg_GUI
         }
 
         /// <summary>
-        /// Only a number can be entered in the 'StartFrame' input
+        /// Minimise application.
         /// </summary>
-        private void ValidateStartFrameIsANumber(object sender, TextCompositionEventArgs e)
+        private void MinButton_Click(object sender, RoutedEventArgs e)
         {
-            e.Handled = new Regex("[^0-9]+").IsMatch(e.Text);
+            WindowState = WindowState.Minimized;
+        }
+
+        /// <summary>
+        /// Close application.
+        /// </summary>
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
         }
 
         /// <summary>
@@ -123,12 +114,44 @@ namespace FFmpeg_GUI
         {
             base.OnClosing(e);
 
-            Settings.Default.ImageName = _imgName.Text;
-            Settings.Default.ImageType = _imgType.SelectedIndex;
-            Settings.Default.StartFrame = string.IsNullOrEmpty(_startFrame.Text) ? "0000" : _startFrame.Text;
-            Settings.Default.FPS = _fps.SelectedIndex;
-            Settings.Default.OutputName = _outName.Text;
-            Settings.Default.OutputType = _outType.SelectedIndex;
+            // MessageBox.Show("Values are not saved"); /// Debug
+            
+            Type page = frame.Content.GetType();
+            if (page == typeof(Page1_Simple))
+            {
+                //MessageBox.Show("Page 1 was last page");
+
+                Page1_Simple p1 = (Page1_Simple)frame.Content;
+
+                Settings.Default.ImageName = p1._imgName.Text;
+                Settings.Default.ImageType = p1._imgType.SelectedIndex;
+                Settings.Default.StartFrame = string.IsNullOrEmpty(p1._startFrame.Text) ? "0000" : p1._startFrame.Text;
+                Settings.Default.FPS = p1._fps.SelectedIndex;
+                Settings.Default.OutputName = p1._outName.Text;
+                Settings.Default.OutputType = p1._outType.SelectedIndex;
+            }
+            else if (page == typeof(Page2_Advanced))
+            {
+                //MessageBox.Show("Page 2 was last page");
+
+                Page2_Advanced p2 = (Page2_Advanced)frame.Content;
+
+                Settings.Default.ImageName = p2._imgName.Text;
+                Settings.Default.ImageType = p2._imgType.SelectedIndex;
+                Settings.Default.StartFrame = string.IsNullOrEmpty(p2._startFrame.Text) ? "0000" : p2._startFrame.Text;
+                Settings.Default.FPS = p2._fps.SelectedIndex;
+                Settings.Default.OutputName = p2._outName.Text;
+                Settings.Default.OutputType = p2._outType.SelectedIndex;
+            }
+
+
+            //Settings.Default.ImageName = imgName;
+            //Settings.Default.ImageType = imgType;
+            //Settings.Default.StartFrame = string.IsNullOrEmpty(startFrame) ? "0000" : startFrame;
+            //Settings.Default.FPS = fps;
+            //Settings.Default.OutputName = outName;
+            //Settings.Default.OutputType = outType;
+
             Settings.Default.Save();
         }
     }
